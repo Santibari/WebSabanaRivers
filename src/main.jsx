@@ -85,7 +85,6 @@ function ConfigError() {
       <img src="/logo-sabana-rivers.png" alt="Sabana Rivers" className="mx-auto h-32 w-auto" />
       <h1 className="mt-8 font-display text-3xl">Web en mantenimiento</h1>
       <p className="mt-3 text-sr-gray">Estamos terminando de configurar la plataforma. Vuelve en unos minutos.</p>
-      <p className="mt-8 text-xs text-sr-gray/70">{configError} Agrégalas en Vercel → Settings → Environment Variables y vuelve a desplegar.</p>
     </div>
   )
 }

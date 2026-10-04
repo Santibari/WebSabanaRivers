@@ -10,9 +10,7 @@ const demoAllowed = import.meta.env.DEV || import.meta.env.VITE_DEMO === 'true'
 
 export const isDemo = !hasSupabase && demoAllowed
 
-/** Mensaje si el build de producción quedó sin las variables de Supabase. */
+/** true si el build de producción quedó sin configurar. El motivo NO se muestra al público. */
 export const configError = !hasSupabase && !demoAllowed
-  ? 'Faltan las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en este despliegue.'
-  : null
 
 export const repo = hasSupabase ? (await import('./supabase.js')).supabaseRepo : demoRepo

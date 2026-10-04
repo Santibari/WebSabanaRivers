@@ -10,8 +10,25 @@ const fail = (message, status = 400) => {
   e.status = status
   throw e
 }
+// Los errores de la base no se muestran tal cual (revelan tablas, políticas y columnas).
+const DB_ERRORS = {
+  23505: 'Ya existe un registro con esos datos (nombre o tag repetido).',
+  42501: 'No tienes permiso para hacer esto.',
+  23514: 'Algún dato no es válido.',
+  23503: 'No se puede completar: hay datos relacionados.',
+  P0001: 'No tienes permiso para hacer esto.',
+}
+const AUTH_ERRORS = {
+  'Invalid login credentials': 'Correo o contraseña incorrectos.',
+  'Email not confirmed': 'Confirma tu correo antes de iniciar sesión.',
+  'User already registered': 'Ese correo ya tiene una cuenta.',
+}
+function friendly(error) {
+  if (import.meta.env.DEV) console.warn('[supabase]', error)
+  return DB_ERRORS[error.code] ?? AUTH_ERRORS[error.message] ?? (error.status === 429 ? 'Demasiados intentos, espera un momento.' : 'No se pudo completar la acción. Intenta de nuevo.')
+}
 const one = ({ data, error }) => {
-  if (error) fail(error.message)
+  if (error) fail(friendly(error))
   return data
 }
 const publicUrl = (bucket, path) => (path ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : null)
