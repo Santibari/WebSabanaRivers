@@ -36,6 +36,15 @@ async function profile() {
   return { id: data.user.id, email: data.user.email, username: p?.username, role: p?.role ?? 'user' }
 }
 
+/** id → username (función profile_names; si la migración 4 no está aplicada, vacío). */
+async function profileNames(ids) {
+  const list = [...new Set(ids.filter(Boolean))]
+  if (!list.length) return {}
+  const { data, error } = await sb.rpc('profile_names', { p_ids: list })
+  if (error) return {}
+  return Object.fromEntries(data.map((p) => [p.id, p.username]))
+}
+
 async function scoringFor(tournamentId) {
   const rows = one(await sb.from('scoring_rules').select('*').eq('tournament_id', tournamentId))
   return Object.fromEntries(rows.map((r) => [r.result_key, { winner: r.points_winner, loser: r.points_loser }]))
@@ -110,8 +119,6 @@ export const supabaseRepo = {
       if (keep.has(b.id)) one(await sb.from('page_blocks').update(row).eq('id', b.id))
       else one(await sb.from('page_blocks').insert(row))
     }
-    const u = await profile()
-    await sb.from('audit_log').insert({ actor_id: u.id, action: 'page.update', entity: 'page', entity_id: slug })
   },
   listEvents: async ({ upcoming = true, limit = 50 } = {}) => {
     let q = sb.from('events').select('*').eq('published', true).order('starts_at').limit(limit)
@@ -169,7 +176,9 @@ export const supabaseRepo = {
     const mine = one(await sb.from('team_members').select('team_id, role').eq('user_id', u.id))
     return Promise.all(mine.map(async (tm) => {
       const t = one(await sb.from('teams').select('*').eq('id', tm.team_id).single())
-      const members = one(await sb.from('team_members').select('*').eq('team_id', tm.team_id))
+      const rows = one(await sb.from('team_members').select('*').eq('team_id', tm.team_id))
+      const names = await profileNames(rows.map((m) => m.user_id))
+      const members = rows.map((m) => ({ ...m, profile: { username: names[m.user_id] ?? (m.user_id === u.id ? u.username : null) } }))
       const registrations = one(await sb.from('tournament_teams').select('*, tournament:tournaments(*)').eq('team_id', tm.team_id))
       return { ...teamView(t), myRole: tm.role, members, registrations }
     }))
@@ -198,7 +207,11 @@ export const supabaseRepo = {
   },
 
   // ───── Usuarios y auditoría ─────
-  listUsers: async () => one(await sb.from('profiles').select('*').order('created_at')),
+  listUsers: async () => {
+    const { data, error } = await sb.rpc('admin_list_users')
+    return error ? one(await sb.from('profiles').select('*').order('created_at')) : data
+  },
+  profileNames,
   setUserRole: async (id, role) => one(await sb.from('profiles').update({ role }).eq('id', id)),
   listAudit: async () => one(await sb.from('audit_log').select('*').order('created_at', { ascending: false }).limit(300)),
   settings: async () => Object.fromEntries(one(await sb.from('settings').select('*')).map((r) => [r.key, r.value])),
@@ -210,7 +223,7 @@ export const supabaseRepo = {
     const path = { ready: 'draft/ready', lock: 'draft/action', timeout: 'draft/timeout', coin: 'match/coin', side: 'match/side', end: 'match/end', report: 'match/report' }[op]
     return api(path, { matchId, token, ...extra })
   },
-  adminDraft: (matchId, op, payload) => api('admin/draft', { matchId, op, payload }),
+  adminDraft: (matchId, op, payload, token) => api('admin/draft', { matchId, op, payload, token }),
   listLiveMatches: async () => {
     const rows = one(await sb.from('matches').select('*, ta:team_a(*), tb:team_b(*), games(*)').order('created_at', { ascending: false }).limit(50))
     return rows.filter((m) => m.games.length).map(({ ta, tb, games, ...m }) => {
@@ -221,7 +234,7 @@ export const supabaseRepo = {
 
   subscribeRoom(matchId, { onRefresh, onHover, onPresence, role }) {
     const ch = sb.channel(`room:${matchId}`, { config: { presence: { key: `${role}-${Math.random().toString(36).slice(2)}` } } })
-    ch.on('broadcast', { event: 'refresh' }, () => onRefresh?.())
+    ch.on('broadcast', { event: 'refresh' }, ({ payload }) => onRefresh?.(payload))
       .on('broadcast', { event: 'hover' }, ({ payload }) => onHover?.(payload))
       .on('presence', { event: 'sync' }, () => {
         const out = { a: 0, b: 0, admin: 0, total: 0 }
@@ -233,6 +246,8 @@ export const supabaseRepo = {
       .subscribe((status) => status === 'SUBSCRIBED' && ch.track({ role }))
     return {
       sendHover: (side, championId) => ch.send({ type: 'broadcast', event: 'hover', payload: { side, championId } }),
+      // La ventana que jugó avisa por su propio websocket (más rápido que esperar el aviso del servidor).
+      sendPatch: (patch) => ch.send({ type: 'broadcast', event: 'refresh', payload: { type: 'refresh', ...patch } }),
       close: () => sb.removeChannel(ch),
     }
   },

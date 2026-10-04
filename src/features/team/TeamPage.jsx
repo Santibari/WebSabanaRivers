@@ -8,7 +8,7 @@ const REG_LABEL = { pendiente: ['Pendiente', 'amber'], aprobado: ['Aprobado', 'g
 
 function CreateTeam() {
   const [form, setForm] = useState({ name: '', tag: '' })
-  const m = useRepoMutation(() => repo.createTeam(form))
+  const m = useRepoMutation(() => repo.createTeam(form), { onSuccess: () => setForm({ name: '', tag: '' }) })
   return (
     <Panel className="p-6" accent="blue">
       <h2 className="font-display text-2xl">Registrar equipo</h2>
@@ -73,7 +73,7 @@ function TeamCard({ team, tournaments }) {
           <ul className="mt-2 divide-y divide-sr-line border border-sr-line">
             {team.members.map((m) => (
               <li key={m.user_id} className="flex justify-between px-4 py-2.5">
-                <span>{m.profile?.username ?? m.profile?.email ?? 'Jugador'}</span>
+                <span>{m.profile?.username ?? 'Jugador sin nombre'}</span>
                 <span className="text-sm text-sr-gray">{m.role === 'captain' ? 'Capitán' : 'Jugador'}</span>
               </li>
             ))}

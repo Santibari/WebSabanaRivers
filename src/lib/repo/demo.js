@@ -467,11 +467,13 @@ export const demoRepo = {
     })
   },
   listAudit: async () => (requireAdmin(), read().audit),
+  profileNames: async (ids) => Object.fromEntries(read().profiles.filter((p) => ids.includes(p.id)).map((p) => [p.id, p.username])),
   settings: async () => read().settings,
 
   // ───── Draft ─────
   createMatch: async (payload) => {
-    const u = requireUser()
+    const u = currentUser()
+    if (payload.matchId || payload.teamA || payload.teamB) requireUser()
     return mutate(async (s) => {
       let match
       if (payload.matchId) {
@@ -479,15 +481,14 @@ export const demoRepo = {
         match = s.matches.find((m) => m.id === payload.matchId)
         if (!match?.team_a || !match?.team_b) fail('El partido aún no tiene los dos equipos')
       } else {
-        const caps = s.team_members.filter((tm) => tm.user_id === u.id && tm.role === 'captain')
-        if (!isAdmin(u) && !caps.length) fail('Solo un capitán o el admin crea matches', 403)
+        // Draft libre: cualquiera puede crearlo sin cuenta; con cuenta se pueden usar equipos registrados.
         match = {
           id: uid('m'), tournament_id: null, phase_id: null, group_id: null,
           team_a: payload.teamA ?? null, team_b: payload.teamB ?? null,
           team_a_name: payload.teamAName ?? null, team_b_name: payload.teamBName ?? null,
           best_of: payload.bestOf, fearless_mode: payload.fearless, pick_seconds: payload.pickSeconds,
           side_method: payload.sideMethod, require_login: false, status: 'programado', score_a: 0, score_b: 0,
-          created_by: u.id, created_at: new Date().toISOString(),
+          created_by: u?.id ?? null, created_at: new Date().toISOString(),
         }
         s.matches.push(match)
       }
@@ -502,24 +503,28 @@ export const demoRepo = {
   },
   getRoom: async (matchId, token) =>
     room(async (svc, store) => svc.getRoom(matchId, resolveActor(store, matchId, token)), matchId, { readOnly: true }),
+  // Igual que /api: cada cambio devuelve { result, room } con la sala ya actualizada.
   roomCall: async (op, matchId, token, extra = {}) =>
     room(async (svc, store) => {
       const actor = resolveActor(store, matchId, token)
-      switch (op) {
-        case 'ready': return svc.setReady(matchId, actor, extra.ready ?? true)
-        case 'lock': return svc.lock(matchId, actor, extra.championId)
-        case 'timeout': return svc.timeout(matchId)
-        case 'coin': return svc.coinToss(matchId, actor)
-        case 'side': return svc.chooseSide(matchId, actor, extra.side)
-        case 'end': return svc.endGame(matchId, actor)
-        case 'report': return svc.report(matchId, actor, extra)
-        default: fail('Operación desconocida')
-      }
+      const run = {
+        ready: () => svc.setReady(matchId, actor, extra.ready ?? true),
+        lock: () => svc.lock(matchId, actor, extra.championId),
+        timeout: () => svc.timeout(matchId),
+        coin: () => svc.coinToss(matchId, actor),
+        side: () => svc.chooseSide(matchId, actor, extra.side),
+        end: () => svc.endGame(matchId, actor),
+        report: () => svc.report(matchId, actor, extra),
+      }[op]
+      if (!run) fail('Operación desconocida')
+      const result = await run()
+      return { result, room: await svc.getRoom(matchId, actor) }
     }, matchId),
   adminDraft: async (matchId, op, payload, token) =>
     room(async (svc, store) => {
       const actor = token ? resolveActor(store, matchId, token) : { role: isAdmin(currentUser()) ? 'admin' : 'none', userId: currentUser()?.id }
-      return svc.admin(matchId, actor, op, payload)
+      await svc.admin(matchId, actor, op, payload)
+      return { room: await svc.getRoom(matchId, actor) }
     }, matchId),
   listLiveMatches: async () => {
     const s = read()
@@ -554,6 +559,7 @@ export const demoRepo = {
     const iv = setInterval(beat, 2500)
     return {
       sendHover: (side, championId) => emit({ type: 'hover', matchId, side, championId }),
+      sendPatch: () => {}, // en el demo el aviso 'store' ya llega al instante a las otras pestañas
       close: () => {
         clearInterval(iv)
         listeners.delete(handler)

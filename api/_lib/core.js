@@ -26,17 +26,36 @@ export class HttpError extends Error {
 export const sha256 = (s) => createHash('sha256').update(s).digest('hex')
 export const newToken = () => randomBytes(32).toString('base64url')
 
-/** Usuario y rol a partir del JWT de Supabase (Authorization: Bearer …). Null si no hay sesión. */
+// Sesiones ya verificadas (por instancia), para no repetir el trabajo en cada pick.
+const sessionCache = new Map()
+
+/**
+ * Usuario y rol a partir del JWT de Supabase (Authorization: Bearer …). Null si no hay sesión.
+ * El JWT se verifica LOCALMENTE con getClaims (llaves asimétricas del proyecto, JWKS en caché),
+ * sin ir al servidor de Auth. El rol se lee de `profiles` y se guarda 30 s.
+ */
 export async function getUser(req) {
   const h = req.headers.authorization ?? ''
   const jwt = h.startsWith('Bearer ') ? h.slice(7) : null
   if (!jwt) return null
+  const hit = sessionCache.get(jwt)
+  if (hit && hit.until > Date.now()) return hit.user
   const sb = supabaseAdmin()
-  const { data, error } = await sb.auth.getUser(jwt)
-  if (error || !data?.user) return null
-  const { data: profile } = await sb.from('profiles').select('role, suspended, username').eq('id', data.user.id).maybeSingle()
+  const { data, error } = await sb.auth.getClaims(jwt)
+  const claims = data?.claims
+  if (error || !claims?.sub) return null
+  const { data: profile } = await sb.from('profiles').select('role, suspended, username').eq('id', claims.sub).maybeSingle()
   if (profile?.suspended) throw new HttpError(403, 'Cuenta suspendida')
-  return { id: data.user.id, email: data.user.email, role: profile?.role ?? 'user', username: profile?.username }
+  const user = { id: claims.sub, email: claims.email, role: profile?.role ?? 'user', username: profile?.username }
+  if (sessionCache.size > 500) sessionCache.clear()
+  sessionCache.set(jwt, { user, until: Math.min(Date.now() + 30_000, (claims.exp ?? 0) * 1000) })
+  return user
+}
+
+/** getUser perezoso y memorizado para una petición: solo se ejecuta si alguien lo necesita. */
+export function lazyUser(req) {
+  let p
+  return () => (p ??= getUser(req))
 }
 
 export const isAdminRole = (role) => role === 'admin' || role === 'superadmin'

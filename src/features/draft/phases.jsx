@@ -167,7 +167,7 @@ export function GameClock({ room, now, call }) {
       <span className="font-cond uppercase tracking-[0.25em] text-sr-gray">Partida</span>
       <span className="font-display text-3xl tabular-nums">{duration(ms)}</span>
       {game.status === 'jugando' && (viewer.role === 'a' || viewer.role === 'b') && (
-        <Button variant="danger" skew onClick={() => act.run('end')} disabled={act.busy}>Terminar encuentro</Button>
+        <Button variant="danger" skew onClick={() => act.run('end')} disabled={act.busy}>{act.busy ? 'Terminando…' : 'Terminar encuentro'}</Button>
       )}
       <ErrorNote error={act.error} />
     </div>

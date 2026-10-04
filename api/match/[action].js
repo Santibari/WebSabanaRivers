@@ -1,14 +1,9 @@
 // /api/match/create · coin · side · end · report
 import { handler, getUser, parse, rateLimit, z, HttpError, supabaseAdmin, sha256, newToken, isAdminRole } from '../_lib/core.js'
-import { roomService, resolveActor, supabaseRoomDb } from '../_lib/room.js'
+import { supabaseRoomDb, mutate } from '../_lib/room.js'
 import { createGame } from '../../shared/room-service.js'
 
 const base = { matchId: z.string().uuid(), token: z.string().min(20).max(100).optional() }
-
-async function actorFor(req, body) {
-  const user = await getUser(req)
-  return { user, actor: await resolveActor({ matchId: body.matchId, token: body.token, user }) }
-}
 
 /** Genera enlaces nuevos (solo se guarda el hash). Invalida los anteriores. */
 async function issueTokens(matchId) {
@@ -40,59 +35,58 @@ export default handler({
   create: {
     run: async ({ req, body }) => {
       const user = await getUser(req)
-      if (!user) throw new HttpError(401, 'Inicia sesión para crear un match')
-      await rateLimit(req, 'match-create', 10, 600, user.id)
       const b = parse(createSchema, body)
       const sb = supabaseAdmin()
       const db = supabaseRoomDb()
       let match
 
       if (b.matchId) {
-        if (!isAdminRole(user.role)) throw new HttpError(403, 'Solo el admin abre la sala de un partido del torneo')
+        if (!isAdminRole(user?.role)) throw new HttpError(403, 'Solo el admin abre la sala de un partido del torneo')
         match = await db.match(b.matchId)
         if (!match) throw new HttpError(404, 'Partido no encontrado')
         if (!match.team_a || !match.team_b) throw new HttpError(409, 'El partido aún no tiene los dos equipos')
       } else {
-        // Amistoso: lo crea un admin o un capitán (de uno de los dos equipos si están registrados).
-        const { data: caps } = await sb.from('team_members').select('team_id').eq('user_id', user.id).eq('role', 'captain')
-        const myTeams = new Set((caps ?? []).map((c) => c.team_id))
-        if (!isAdminRole(user.role) && !myTeams.size) throw new HttpError(403, 'Solo un capitán o el admin crea matches')
-        if (!isAdminRole(user.role) && b.teamA && b.teamB && !myTeams.has(b.teamA) && !myTeams.has(b.teamB))
-          throw new HttpError(403, 'Tu equipo debe jugar el amistoso')
-        if (!(b.teamA || b.teamAName) || !(b.teamB || b.teamBName)) throw new HttpError(400, 'Faltan los equipos')
-        match = (await sb.from('matches').insert({
+        // Amistoso / draft libre: cualquiera puede crearlo, sin cuenta. Con cuenta se pueden usar equipos registrados.
+        await rateLimit(req, 'match-create', user ? 15 : 6, 600, user?.id)
+        if ((b.teamA || b.teamB) && !user) throw new HttpError(401, 'Inicia sesión para usar equipos registrados')
+        if (user && !isAdminRole(user.role) && (b.teamA || b.teamB)) {
+          const { data: caps } = await sb.from('team_members').select('team_id').eq('user_id', user.id).eq('role', 'captain')
+          const mine = new Set((caps ?? []).map((c) => c.team_id))
+          if (!mine.has(b.teamA) && !mine.has(b.teamB)) throw new HttpError(403, 'Tu equipo debe jugar el amistoso')
+        }
+        if (!(b.teamA || b.teamAName) || !(b.teamB || b.teamBName)) throw new HttpError(400, 'Faltan los nombres de los equipos')
+        const { data, error } = await sb.from('matches').insert({
           team_a: b.teamA ?? null, team_b: b.teamB ?? null, team_a_name: b.teamAName ?? null, team_b_name: b.teamBName ?? null,
           best_of: b.bestOf, fearless_mode: b.fearless, pick_seconds: b.pickSeconds, side_method: b.sideMethod,
-          require_login: false, created_by: user.id,
-        }).select().single()).data
+          require_login: false, created_by: user?.id ?? null,
+        }).select().single()
+        if (error) throw error
+        match = data
       }
 
-      const games = await db.games(match.id)
-      if (!games.length) await createGame(db, match, 1)
+      const bundle = await db.bundle(match.id)
+      if (!bundle.games.length) await createGame(db, match, 1)
       const tokens = await issueTokens(match.id)
-      await sb.from('audit_log').insert({ actor_id: user.id, action: 'match.links', entity: 'match', entity_id: match.id })
+      if (user) await sb.from('audit_log').insert({ actor_id: user.id, action: 'match.links', entity: 'match', entity_id: match.id })
       return { matchId: match.id, tokens }
     },
   },
   coin: {
     run: async ({ req, body }) => {
       const b = parse(z.object(base), body)
-      const { actor } = await actorFor(req, b)
-      return roomService().coinToss(b.matchId, actor)
+      return mutate(req, b, (svc, actor) => svc.coinToss(b.matchId, actor))
     },
   },
   side: {
     run: async ({ req, body }) => {
       const b = parse(z.object({ ...base, side: z.enum(['blue', 'red']) }), body)
-      const { actor } = await actorFor(req, b)
-      await roomService().chooseSide(b.matchId, actor, b.side)
+      return mutate(req, b, (svc, actor) => svc.chooseSide(b.matchId, actor, b.side))
     },
   },
   end: {
     run: async ({ req, body }) => {
       const b = parse(z.object(base), body)
-      const { actor } = await actorFor(req, b)
-      await roomService().endGame(b.matchId, actor)
+      return mutate(req, b, (svc, actor) => svc.endGame(b.matchId, actor))
     },
   },
   report: {
@@ -104,9 +98,7 @@ export default handler({
         towers: z.number().int().min(0).max(11),
         dragons: z.number().int().min(0).max(20),
       }), body)
-      const { actor, user } = await actorFor(req, b)
-      await rateLimit(req, 'report', 10, 60, user?.id)
-      return roomService().report(b.matchId, actor, b)
+      return mutate(req, b, (svc, actor) => svc.report(b.matchId, actor, b), () => rateLimit(req, 'report', 10, 60))
     },
   },
 })

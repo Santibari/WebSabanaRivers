@@ -2,6 +2,7 @@
 // Para un tipo nuevo: agregar aquí el componente y su editor en features/admin/AdminContent.jsx.
 import { Link } from 'react-router-dom'
 import { CircuitBackground } from './CircuitBackground.jsx'
+import { Reveal } from './Reveal.jsx'
 import { GroupTable } from './tournament.jsx'
 import { Logo, Eyebrow, Button } from './ui.jsx'
 import { useRepoQuery } from '../app/hooks.jsx'
@@ -35,7 +36,7 @@ function Hero({ content }) {
       )}
       <CircuitBackground />
       <div className="relative mx-auto flex min-h-[560px] max-w-6xl flex-col items-center justify-center px-4 py-20 text-center sm:px-6">
-        <div className="animate-rise"><Logo className="size-28 sm:size-32" /></div>
+        <div className="animate-rise"><Logo className="h-36 w-auto animate-float drop-shadow-[0_0_30px_rgb(79_179_255/0.35)] sm:h-44" /></div>
         <h1 className="mt-6 animate-rise font-display text-5xl tracking-[0.04em] sm:text-7xl [animation-delay:120ms]">{content.title}</h1>
         <p className="mt-4 animate-rise eyebrow text-sr-sky !text-base [animation-delay:240ms]">{content.subtitle}</p>
         {content.cta?.text && (
@@ -77,10 +78,10 @@ function ActiveTournaments({ content }) {
       {data.map(({ tournament: t, groups, phases }) => {
         const groupPhase = phases.find((p) => p.type === 'groups')
         return (
-          <div key={t.id} className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
+          <Reveal key={t.id} className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
             <div className="flex flex-wrap items-end justify-between gap-6">
               <div className="flex items-center gap-4">
-                <Logo className="size-14" />
+                <Logo className="h-16 w-auto" />
                 <div>
                   <Eyebrow>Torneo activo</Eyebrow>
                   <Link to={`/torneos/${t.slug}`} className="font-display text-4xl hover:text-sr-sky sm:text-5xl">{t.name}</Link>
@@ -95,12 +96,14 @@ function ActiveTournaments({ content }) {
               </div>
             </div>
             <div className="mt-8 grid gap-6 md:grid-cols-2">
-              {groups.map((g, i) => <GroupTable key={g.id} group={g} accent={i % 2 ? 'red' : 'blue'} compact />)}
+              {groups.map((g, i) => (
+                <Reveal key={g.id} delay={i * 120}><GroupTable group={g} accent={i % 2 ? 'red' : 'blue'} compact /></Reveal>
+              ))}
             </div>
             <div className="mt-6 text-right">
               <Link to={`/torneos/${t.slug}`} className="eyebrow text-sr-sky hover:underline !text-xs">Ver calendario y bracket →</Link>
             </div>
-          </div>
+          </Reveal>
         )
       })}
     </section>
@@ -110,16 +113,18 @@ function ActiveTournaments({ content }) {
 function Cards({ content }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pt-24 sm:px-6">
-      {content.eyebrow && <Eyebrow>{content.eyebrow}</Eyebrow>}
-      {content.title && <h2 className="mt-2 font-display text-4xl sm:text-5xl">{content.title}</h2>}
+      <Reveal>
+        {content.eyebrow && <Eyebrow>{content.eyebrow}</Eyebrow>}
+        {content.title && <h2 className="mt-2 font-display text-4xl sm:text-5xl">{content.title}</h2>}
+      </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {(content.items ?? []).map((c, i) => (
-          <article key={i} className="group border border-sr-line bg-sr-panel/90 p-6 transition-all hover:-translate-y-1 hover:border-sr-blue">
+          <Reveal key={i} delay={i * 110} as="article" className="group border border-sr-line bg-sr-panel/90 p-6 transition-[border-color,box-shadow,translate] duration-300 hover:-translate-y-1 hover:border-sr-blue hover:shadow-[0_12px_40px_rgb(30_90_168/0.25)]">
             <span className="text-sr-sky transition-transform group-hover:scale-110 inline-block"><Icon name={c.icon} /></span>
             <p className="mt-4 font-cond font-bold text-sr-gray">{String(i + 1).padStart(2, '0')}</p>
             <h3 className="mt-1 text-lg font-bold">{c.title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-[#c9d1dd]">{c.text}</p>
-          </article>
+          </Reveal>
         ))}
       </div>
     </section>
@@ -131,15 +136,15 @@ function Events({ content }) {
   if (!data.length) return null
   return (
     <section className="mx-auto max-w-6xl px-4 pt-24 sm:px-6">
-      <h2 className="font-display text-4xl sm:text-5xl">{content.title ?? 'Próximos eventos'}</h2>
+      <Reveal><h2 className="font-display text-4xl sm:text-5xl">{content.title ?? 'Próximos eventos'}</h2></Reveal>
       <div className="mt-10 grid gap-4 md:grid-cols-3">
         {data.map((e, i) => (
-          <article key={e.id} className="relative border border-sr-line bg-sr-panel/90 p-6 [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,0_100%)]">
+          <Reveal key={e.id} delay={i * 110} as="article" className="relative border border-sr-line bg-sr-panel/90 p-6 transition-colors hover:border-sr-sky [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,0_100%)]">
             <p className={`eyebrow !text-xs ${i === data.length - 1 && data.length > 2 ? 'text-sr-red' : 'text-sr-sky'}`}>{formatDateTime(e.starts_at)}</p>
             <h3 className="mt-2 text-xl font-bold">{e.title}</h3>
             <p className="mt-1 text-sm text-sr-gray">{e.location}</p>
             {e.description && <p className="mt-3 text-sm text-[#c9d1dd]">{e.description}</p>}
-          </article>
+          </Reveal>
         ))}
       </div>
     </section>
@@ -148,10 +153,10 @@ function Events({ content }) {
 
 function RichText({ content }) {
   return (
-    <section className="mx-auto max-w-3xl px-4 pt-24 sm:px-6">
+    <Reveal as="section" className="mx-auto max-w-3xl px-4 pt-24 sm:px-6">
       {content.title && <h2 className="font-display text-4xl">{content.title}</h2>}
       <div className="prose-sr mt-4" dangerouslySetInnerHTML={{ __html: sanitize(content.html) }} />
-    </section>
+    </Reveal>
   )
 }
 

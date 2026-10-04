@@ -25,27 +25,32 @@ const sideSlot = (game, side) => (side === 'blue' ? game.blue_slot : game.blue_s
 export function createRoomService(db, { now = () => Date.now(), random = Math.random, championIds } = {}) {
   const iso = (ms) => new Date(ms).toISOString()
 
+  /**
+   * Toda la sala en una sola lectura (`db.bundle`): match, equipos, fase, grupo, torneo, monedas
+   * y cada partida con su sesión, acciones y reportes. Con Supabase es UNA consulta anidada.
+   */
   async function load(matchId) {
-    const match = await db.match(matchId)
-    if (!match) throw new RoomError('Match no encontrado', 404)
-    const games = (await db.games(matchId)).sort((x, y) => x.number - y.number)
+    const b = await db.bundle(matchId)
+    if (!b?.match) throw new RoomError('Match no encontrado', 404)
+    const games = [...b.games].sort((x, y) => x.number - y.number)
     const game = games.at(-1) ?? null
-    const session = game ? await db.session(game.id) : null
-    const actions = session ? await db.actions(session.id) : []
-    return { match, games, game, session, actions, steps: session?.steps ?? TOURNAMENT_TEMPLATE }
+    const session = game?.session ?? null
+    return {
+      ...b, games, game, session,
+      actions: [...(game?.actions ?? [])].sort((x, y) => x.step - y.step),
+      reports: game?.reports ?? [],
+      steps: session?.steps ?? TOURNAMENT_TEMPLATE,
+    }
   }
 
   /** Picks de las partidas cerradas, para Fearless y para la franja "ya jugados". */
-  async function previousGames(games, currentGame) {
-    const out = []
-    for (const g of games) {
-      if (currentGame && g.id === currentGame.id) continue
-      const s = await db.session(g.id)
-      const acts = s ? await db.actions(s.id) : []
-      const st = buildDraftState(s?.steps ?? TOURNAMENT_TEMPLATE, acts)
-      out.push({ number: g.number, blue_team: g.blue_slot, red_team: g.blue_slot === 'a' ? 'b' : 'a', picks: st.picks, bans: st.bans })
-    }
-    return out
+  function previousGames(games, currentGame) {
+    return games
+      .filter((g) => !currentGame || g.id !== currentGame.id)
+      .map((g) => {
+        const st = buildDraftState(g.session?.steps ?? TOURNAMENT_TEMPLATE, g.actions ?? [])
+        return { number: g.number, blue_team: g.blue_slot, red_team: g.blue_slot === 'a' ? 'b' : 'a', picks: st.picks, bans: st.bans }
+      })
   }
 
   function actorSide(ctx, actor) {
@@ -61,36 +66,32 @@ export function createRoomService(db, { now = () => Date.now(), random = Math.ra
     if (actor.role !== 'admin') throw new RoomError('Solo el admin puede hacer esto', 403)
   }
 
-  async function changed(matchId) {
-    await db.broadcast?.(matchId, { type: 'refresh' })
+  /** Aviso a las ventanas de la sala. `patch` permite dibujar el cambio sin esperar a releer. */
+  async function changed(matchId, patch = null) {
+    await db.broadcast?.(matchId, { type: 'refresh', ...(patch ?? {}) })
   }
 
   return {
     /** Estado completo de la sala para un actor. */
     async getRoom(matchId, actor) {
       const ctx = await load(matchId)
-      const { match, games, game, session, actions, steps } = ctx
-      const prev = await previousGames(games, game)
-      const [teamA, teamB] = await db.teams([match.team_a, match.team_b])
-      const phase = match.phase_id ? await db.phase(match.phase_id) : null
-      const group = match.group_id ? await db.group?.(match.group_id) : null
-      const tournament = match.tournament_id ? await db.tournament(match.tournament_id) : null
-      const reports = game ? await db.reports(game.id) : []
-      const coin = game ? await db.coin?.(match.id, game.number) : null
+      const { match, games, game, session, actions, steps, reports } = ctx
+      const prev = previousGames(games, game)
       const isAdmin = actor.role === 'admin'
+      const coin = game ? (ctx.coins ?? []).filter((c) => c.game_number === game.number).at(-1) ?? null : null
+      const strip = ({ session: _s, actions: _a, reports: _r, ...g }) => g
       return {
         serverNow: now(),
         viewer: { role: actor.role, side: actorSide(ctx, actor) },
         match: {
           ...match,
-          teamA: teamA ?? { name: match.team_a_name ?? 'Equipo A' },
-          teamB: teamB ?? { name: match.team_b_name ?? 'Equipo B' },
-          phase, groupName: group?.name ?? null,
-          tournament: tournament ? { name: tournament.name, slug: tournament.slug } : null,
+          teamA: ctx.teamA ?? { name: match.team_a_name ?? 'Equipo A' },
+          teamB: ctx.teamB ?? { name: match.team_b_name ?? 'Equipo B' },
+          phase: ctx.phase ?? null, groupName: ctx.group?.name ?? null,
+          tournament: ctx.tournament ? { name: ctx.tournament.name, slug: ctx.tournament.slug } : null,
         },
-        games: games.map((g) => ({ ...g, ...(prev.find((p) => p.number === g.number) ?? {}) })),
-        game, session, steps,
-        actions: actions.sort((x, y) => x.step - y.step),
+        games: games.map((g) => ({ ...strip(g), ...(prev.find((p) => p.number === g.number) ?? {}) })),
+        game: game ? strip(game) : null, session, steps, actions,
         previous: prev,
         locked: {
           a: [...fearlessLocked(match.fearless_mode, prev, 'a')],
@@ -157,13 +158,12 @@ export function createRoomService(db, { now = () => Date.now(), random = Math.ra
       const { match, games, game, session, actions, steps } = ctx
       if (!session) throw new RoomError('No hay draft')
       const side = actorSide(ctx, actor)
-      const prev = await previousGames(games, game)
+      const prev = previousGames(games, game)
       const locked = fearlessLocked(match.fearless_mode, prev, actor.role)
       const ids = championIds ? await championIds() : null
       const v = validateAction({ steps, actions, side, championId, locked, championIds: ids, session, now: now() })
       if (!v.ok) throw new RoomError(v.error, 409)
       await applyAction(ctx, { step: v.step, type: v.type, side, championId, by: actor.userId ?? null })
-      await changed(matchId)
     },
 
     /** Lo llama cualquier ventana cuando el contador llega a cero. Idempotente. */
@@ -172,15 +172,14 @@ export function createRoomService(db, { now = () => Date.now(), random = Math.ra
       const { match, games, game, session, actions, steps } = ctx
       if (!session || session.status !== 'drafting' || session.paused) return { applied: false }
       if (now() <= new Date(session.deadline_at).getTime()) return { applied: false }
-      const prev = await previousGames(games, game)
+      const prev = previousGames(games, game)
       const st = buildDraftState(steps, actions)
       if (st.done) return { applied: false }
       const owner = sideSlot(game, st.current.side)
       const locked = fearlessLocked(match.fearless_mode, prev, owner)
       const ids = championIds ? await championIds() : new Set()
       const choice = timeoutChoice({ steps, actions, locked, championIds: ids, random })
-      const ok = await applyAction(ctx, { step: choice.step, type: choice.type, side: choice.side, championId: choice.championId, by: null, auto: true })
-      if (ok) await changed(matchId)
+      const ok = await applyAction(ctx, { step: choice.step, type: choice.type, side: choice.side, championId: choice.championId, by: null })
       return { applied: ok }
     },
 
@@ -272,12 +271,16 @@ export function createRoomService(db, { now = () => Date.now(), random = Math.ra
     })
     if (!inserted) return false
     const next = step + 1
-    if (next >= steps.length) {
-      await db.updateSession(session.id, { current_step: next, status: 'done', deadline_at: null })
-      await db.updateGame(game.id, { status: 'jugando', started_at: iso(now()) })
-    } else {
-      await db.updateSession(session.id, { current_step: next, deadline_at: iso(now() + session.pick_seconds * 1000) })
-    }
+    const done = next >= steps.length
+    const sessionPatch = done
+      ? { current_step: next, status: 'done', deadline_at: null }
+      : { current_step: next, deadline_at: iso(now() + session.pick_seconds * 1000) }
+    await Promise.all([
+      db.updateSession(session.id, sessionPatch),
+      done ? db.updateGame(game.id, { status: 'jugando', started_at: iso(now()) }) : null,
+    ])
+    // La jugada viaja en el aviso: las otras ventanas la dibujan al instante y luego releen.
+    await changed(game.match_id, { action: inserted, session: { id: session.id, ...sessionPatch } })
     return true
   }
 
@@ -289,7 +292,7 @@ export function createRoomService(db, { now = () => Date.now(), random = Math.ra
       { result_status: game.result_status },
     )
     if (!updated) return
-    const games = await db.games(match.id)
+    const { games } = await db.bundle(match.id)
     const out = seriesOutcome(match.best_of, games.map((g) => ({ winner_id: g.winner_slot, result_status: g.result_status })), 'a', 'b')
     if (out.done) {
       const winnerTeam = out.winner ? match[`team_${out.winner}`] : null

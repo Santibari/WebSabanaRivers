@@ -18,7 +18,9 @@ function NavTab({ to, label, end, onClick }) {
       onClick={onClick}
       className={({ isActive }) =>
         `relative py-2 font-cond font-semibold uppercase tracking-[0.18em] text-[0.95rem] transition-colors ${
-          isActive ? 'text-sr-sky after:absolute after:inset-x-0 after:-bottom-1 after:h-0.5 after:bg-sr-sky' : 'text-sr-white hover:text-sr-sky'
+          isActive
+            ? 'text-sr-sky after:absolute after:inset-x-0 after:-bottom-1 after:h-0.5 after:bg-sr-sky after:shadow-[0_0_10px_rgb(79_179_255)]'
+            : 'text-sr-white hover:text-sr-sky after:absolute after:inset-x-0 after:-bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-sr-sky after:transition-transform after:duration-300 hover:after:scale-x-100'
         }`
       }
     >
@@ -34,8 +36,8 @@ export function Header() {
   return (
     <header className="relative z-20">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-3" onClick={close}>
-          <Logo className="size-10" />
+        <Link to="/" className="group flex items-center gap-3" onClick={close}>
+          <Logo className="h-11 w-auto transition-transform duration-300 group-hover:scale-105" />
           <span className="leading-none">
             <span className="block font-display text-lg tracking-[0.06em]">SABANA RIVERS</span>
             <span className="block font-cond text-xs font-semibold tracking-[0.5em] text-sr-sky">DRAFT</span>
@@ -93,7 +95,7 @@ export function Layout() {
     <div className="sr-grid min-h-dvh">
       <DemoBanner />
       <Header />
-      <main key={pathname} className="relative">
+      <main key={pathname} className="relative animate-[fade-in_0.35s_ease-out_both]">
         <Outlet />
       </main>
       <Footer />

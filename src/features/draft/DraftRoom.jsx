@@ -8,7 +8,7 @@ import { Stage, SideSelect, CoinReveal, Lobby, GameClock, ReportForm, SeriesDone
 
 export function DraftRoom() {
   const { id, token } = useParams()
-  const { room, derived: d, error, hover, presence, now, remaining, call, adminOp, sendHover } = useRoom(id, token)
+  const { room, derived: d, error, hover, presence, now, remaining, call, adminOp, lock, pending, sendHover } = useRoom(id, token)
   const { data: champs, error: champError } = useChampions()
 
   if (error && !room)
@@ -56,7 +56,7 @@ export function DraftRoom() {
 
   return (
     <>
-      <CaptainBoard room={room} d={d} champs={champs} hover={hover} remaining={remaining} call={call} sendHover={sendHover} footer={game.started_at ? clock : null} />
+      <CaptainBoard room={room} d={d} champs={champs} hover={hover} remaining={remaining} lock={lock} pending={pending} sendHover={sendHover} footer={game.started_at ? clock : null} />
       {game.status === 'reporte' && (
         <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/80 p-4">
           <div className="flex flex-col items-center gap-4">

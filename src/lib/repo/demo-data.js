@@ -23,7 +23,7 @@ export function demoSeed() {
     { id: 't-nob', name: 'Noctua Owls Black', tag: 'NOB', captain_id: 'u-nob' },
     { id: 't-wura', name: 'Wolves UR Academy', tag: 'WURA', captain_id: 'u-wura' },
     { id: 't-sra', name: 'SR Academy', tag: 'SRA', captain_id: 'u-sra' },
-  ].map((t) => ({ ...t, logo_url: t.id === 't-sr' ? '/logo-sabana-rivers.svg' : null, status: 'activo' }))
+  ].map((t) => ({ ...t, logo_url: t.id === 't-sr' ? '/logo-sabana-rivers-azul.webp' : null, status: 'activo' }))
   const team_members = teams.map((t) => ({ team_id: t.id, user_id: t.captain_id, role: 'captain' }))
 
   const tournament = {

@@ -2,11 +2,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-/** Cambia este archivo por el logo oficial (PNG/SVG) en /public. */
-export const LOGO_URL = '/logo-sabana-rivers.svg'
+/** Logos oficiales (originales en Claude/design/logos/). */
+export const LOGO_URL = '/logo-sabana-rivers.png' // blanco sin fondo, para fondos oscuros
+export const LOGO_BADGE_URL = '/logo-sabana-rivers-azul.webp' // con fondo azul, para avatares y redes
 
-export function Logo({ className = 'size-10' }) {
-  return <img src={LOGO_URL} alt="Sabana Rivers" className={`${className} object-contain`} />
+export function Logo({ className = 'size-10', badge = false }) {
+  return <img src={badge ? LOGO_BADGE_URL : LOGO_URL} alt="Sabana Rivers" className={`${className} object-contain`} />
 }
 
 const variants = {

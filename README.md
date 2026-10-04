@@ -39,6 +39,13 @@ En desarrollo, Vite sirve las funciones de `/api` con el mismo formato `(req, re
 | `src/features/` | Inicio (bloques del CMS), torneos, draft (vista del capitán, espectador del admin, fases de la sala), mi equipo, admin |
 | `scripts/seed-roles.js` | Convierte `Claude/.skills/Numero de campeones y sus roles.md` en `shared/champion-roles.json` y `supabase/seed/champion_roles.sql` (`npm run seed:roles`) |
 
+**Draft libre:** en `/draft` cualquiera crea una sala sin cuenta (límite por IP). Los partidos de torneo
+siguen exigiendo sesión con la cuenta del equipo.
+
+**Velocidad:** la sala se lee en una sola consulta anidada, la sesión se verifica localmente (`getClaims`
+con las llaves ES256 del proyecto), cada cambio devuelve la sala nueva y los avisos de Realtime llevan
+la jugada para que las otras ventanas la dibujen al instante.
+
 **El servidor manda:** el navegador nunca escribe picks ni bans. Todo pasa por `shared/room-service.js`, que valida
 turno, tiempo, disponibilidad y Fearless. La restricción única `(session_id, step)` evita acciones dobles.
 
@@ -49,7 +56,7 @@ turno, tiempo, disponibilidad y Fearless. La restricción única `(session_id, s
   Así se respeta que un draft en curso solo lo vean los dos equipos y el admin.
 - Los puntos de una serie se suman cuando la serie termina. Los dragones y las torres cuentan desde cada partida confirmada.
 - La ruta de íconos de rol de `data_dragon_iconos.md` ya da 404 en Community Dragon. Se usan los íconos del plugin de Clash.
-- Logo: `public/logo-sabana-rivers.svg` es provisional. Reemplázalo por el oficial y cambia `LOGO_URL` en `src/components/ui.jsx` si cambia la extensión.
+- Logos oficiales en `public/` (procesados desde `Claude/design/logos/`): blanco sin fondo para la web y azul para avatares y favicon.
 
 ## Pendiente (fases siguientes del plan)
 

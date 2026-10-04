@@ -37,7 +37,7 @@ export function TournamentDetail() {
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6">
       <Eyebrow>{STATUS_LABEL[t.status]} · {t.teamsCount} equipos</Eyebrow>
-      <h1 className="mt-2 font-display text-5xl leading-none sm:text-7xl">Torneo {t.name}</h1>
+      <h1 className="mt-2 animate-rise font-display text-5xl leading-none sm:text-7xl">{/torneo/i.test(t.name) ? t.name : `Torneo ${t.name}`}</h1>
       <div className="mt-6 border-t-2 border-sr-white" />
       <div className="mt-6">
         <TabBar

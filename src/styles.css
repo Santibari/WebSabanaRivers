@@ -61,15 +61,99 @@
     50% { transform: rotateY(900deg) translateY(-40px); }
     100% { transform: rotateY(1800deg) translateY(0); }
   }
+
+  /* ——— Draft ——— */
+  --animate-lock-in: lock-in 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ban-slam: ban-slam 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  --animate-strike: strike 0.35s 0.2s ease-out both;
+  --animate-pop-in: pop-in 0.35s ease-out both;
+  --animate-toast: toast 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-urgent: urgent 0.5s ease-in-out infinite;
+  --animate-reveal-up: reveal-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-name-in: name-in 0.5s 0.35s ease-out both;
+  --animate-shimmer: shimmer 1.2s linear infinite;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes lock-in {
+    0% { filter: brightness(2.6) saturate(0); transform: scale(1.06); }
+    35% { filter: brightness(1.5); }
+    100% { filter: none; transform: none; }
+  }
+  @keyframes ban-slam {
+    0% { opacity: 0; transform: scale(1.9) rotate(-10deg); }
+    70% { opacity: 1; transform: scale(0.94) rotate(1deg); }
+    100% { transform: none; }
+  }
+  @keyframes strike {
+    from { transform: rotate(-12deg) scaleX(0); }
+    to { transform: rotate(-12deg) scaleX(1); }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes toast {
+    0% { opacity: 0; transform: translate(-50%, -30px) scale(0.9); }
+    12%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -10px) scale(0.98); }
+  }
+  @keyframes urgent {
+    50% { transform: scale(1.12); }
+  }
+  @keyframes reveal-up {
+    from { clip-path: inset(100% 0 0 0); transform: scale(1.12); }
+    to { clip-path: inset(0 0 0 0); transform: scale(1); }
+  }
+  @keyframes name-in {
+    from { opacity: 0; transform: translateY(14px); letter-spacing: 0.3em; }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
 }
 
-html { background: var(--sr-ink); color-scheme: dark; }
+/* Barrido de luz al fijar un campeón */
+.sweep { position: relative; overflow: hidden; }
+.sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.45) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: sweep 0.9s 0.1s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes sweep { to { transform: translateX(100%); } }
+
+/* Slot "pensando" mientras el servidor confirma */
+.shimmer-bg {
+  background-image: linear-gradient(90deg, transparent, rgb(79 179 255 / 0.18), transparent);
+  background-size: 200% 100%;
+}
+
+/* Aparición al hacer scroll (ver components/Reveal.jsx) */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.reveal.is-visible { opacity: 1; transform: none; }
+
+html { background: var(--sr-ink); color-scheme: dark; overflow-x: clip; }
 body {
   background: var(--sr-ink);
   color: var(--sr-white);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
+  overflow-x: clip; /* la cinta inclinada del inicio no debe crear scroll horizontal */
 }
 
 /* Rejilla sutil del afiche */

@@ -51,7 +51,7 @@ export function AdminUsers() {
         {users?.map((u) => (
           <div key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <span className="font-semibold">{u.username ?? '—'}</span>
-            <span className="text-sm text-sr-gray">{u.email}</span>
+            <span className="text-sm text-sr-gray">{u.email ?? 'correo no disponible (aplica la migración 4)'}</span>
             <div className="ml-auto w-44">
               <Select value={u.role} disabled={user.role !== 'superadmin' || u.id === user.id} onChange={(e) => m.mutate({ id: u.id, role: e.target.value })}>
                 {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -66,6 +66,7 @@ export function AdminUsers() {
 
 export function AdminAudit() {
   const { data, isLoading } = useRepoQuery(['audit'], () => repo.listAudit())
+  const { data: names = {} } = useRepoQuery(['audit-names', data?.length], () => repo.profileNames((data ?? []).map((a) => a.actor_id).filter(Boolean)), { enabled: !!data?.length })
   return (
     <>
       <AdminHeader title="Auditoría" />
@@ -82,7 +83,7 @@ export function AdminAudit() {
                 <td className="whitespace-nowrap p-2 text-sr-gray">{new Date(a.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</td>
                 <td className="p-2 font-semibold">{a.action}</td>
                 <td className="p-2">{a.entity} <span className="text-sr-gray">{String(a.entity_id ?? '').slice(0, 12)}</span></td>
-                <td className="p-2 text-sr-gray">{String(a.actor_id ?? '—').slice(0, 12)}</td>
+                <td className="p-2 text-sr-gray">{a.actor_id ? names[a.actor_id] ?? String(a.actor_id).slice(0, 8) : 'Sistema / enlace'}</td>
                 <td className="max-w-md truncate p-2 font-mono text-xs text-sr-gray">{a.after ? JSON.stringify(a.after) : ''}</td>
               </tr>
             ))}

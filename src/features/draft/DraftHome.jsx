@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth, useRepoQuery, useRepoMutation, isAdminUser } from '../../app/hooks.jsx'
 import { repo } from '../../lib/repo/index.js'
-import { Eyebrow, Title, Button, Field, Input, Select, ErrorNote, Panel, Empty, Badge, TeamLogo } from '../../components/ui.jsx'
+import { Eyebrow, Title, Button, Field, Input, Select, ErrorNote, Panel, Badge, TeamLogo } from '../../components/ui.jsx'
 
 const ROOMS_KEY = 'sr-my-rooms'
 const readRooms = () => {
@@ -58,7 +58,7 @@ export function LinksPanel({ matchId, tokens, nameA, nameB }) {
 
 function CreateFriendly() {
   const { user } = useAuth()
-  const { data: teams = [] } = useRepoQuery(['teams'], () => repo.listTeams())
+  const { data: teams = [] } = useRepoQuery(['teams'], () => repo.listTeams(), { enabled: !!user })
   const [form, setForm] = useState({ teamA: '', teamB: '', teamAName: '', teamBName: '', bestOf: 3, fearless: 'hard', pickSeconds: 30, sideMethod: 'auto' })
   const [created, setCreated] = useState(null)
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
@@ -81,13 +81,6 @@ function CreateFriendly() {
     },
   )
 
-  if (!user)
-    return (
-      <Panel className="p-6">
-        <p className="text-[#c9d1dd]">Para crear un match necesitas una cuenta de capitán o de admin.</p>
-        <Button as={Link} to="/login" className="mt-4">Iniciar sesión</Button>
-      </Panel>
-    )
   if (created)
     return (
       <Panel className="space-y-5 p-6" accent="blue">
@@ -99,13 +92,17 @@ function CreateFriendly() {
 
   const teamPicker = (slot) => (
     <div className="space-y-2">
-      <Field label={`Equipo ${slot}`}>
-        <Select value={form[`team${slot}`]} onChange={set(`team${slot}`)}>
-          <option value="">Escribir nombre (no registrado)</option>
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.name} [{t.tag}]</option>)}
-        </Select>
-      </Field>
-      {!form[`team${slot}`] && <Input placeholder="Nombre del equipo" value={form[`team${slot}Name`]} onChange={set(`team${slot}Name`)} maxLength={40} />}
+      {user && teams.length > 0 ? (
+        <Field label={`Equipo ${slot}`}>
+          <Select value={form[`team${slot}`]} onChange={set(`team${slot}`)}>
+            <option value="">Escribir nombre</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name} [{t.tag}]</option>)}
+          </Select>
+        </Field>
+      ) : (
+        <span className="eyebrow !text-[0.7rem] text-sr-gray">Equipo {slot}</span>
+      )}
+      {!form[`team${slot}`] && <Input placeholder="Nombre del equipo" value={form[`team${slot}Name`]} onChange={set(`team${slot}Name`)} maxLength={40} required minLength={2} />}
     </div>
   )
 
@@ -204,7 +201,8 @@ export function DraftHome() {
       <div className="mt-6 border-t-2 border-sr-white" />
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
         <section>
-          <h2 className="eyebrow text-sr-gray">Crear amistoso</h2>
+          <h2 className="eyebrow text-sr-gray">Draft libre · sin cuenta</h2>
+          <p className="mt-1 text-sm text-[#c9d1dd]">Crea una sala para practicar o jugar un amistoso. Comparte el enlace de cada equipo y guarda el de admin para controlar la sala.</p>
           <div className="mt-3"><CreateFriendly /></div>
         </section>
         <section>
@@ -213,7 +211,12 @@ export function DraftHome() {
         </section>
       </div>
       <MyRooms />
-      {!user && <div className="mt-10"><Empty>Inicia sesión para ver los partidos de tu equipo.</Empty></div>}
+      {!user && (
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border border-sr-line bg-sr-panel/80 p-6">
+          <p className="text-[#c9d1dd]"><b className="text-sr-white">¿Juegas un torneo?</b> Los drafts oficiales exigen iniciar sesión con la cuenta de tu equipo.</p>
+          <Button as={Link} to="/login">Iniciar sesión</Button>
+        </div>
+      )}
     </div>
   )
 }

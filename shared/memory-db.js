@@ -31,6 +31,32 @@ export function createMemoryDb(store, { onChange, broadcast } = {}) {
 
   return {
     store,
+    /** Toda la sala de una vez (equivalente a la consulta anidada de Supabase). */
+    bundle: async (matchId) => {
+      const match = store.matches.find((m) => m.id === matchId)
+      if (!match) return null
+      const team = (id) => clone(store.teams.find((t) => t.id === id)) ?? null
+      return clone({
+        match,
+        teamA: team(match.team_a),
+        teamB: team(match.team_b),
+        phase: store.phases.find((p) => p.id === match.phase_id) ?? null,
+        group: store.groups.find((g) => g.id === match.group_id) ?? null,
+        tournament: store.tournaments.find((t) => t.id === match.tournament_id) ?? null,
+        coins: store.coins.filter((c) => c.match_id === matchId),
+        games: store.games
+          .filter((g) => g.match_id === matchId)
+          .map((g) => {
+            const session = store.sessions.find((s) => s.game_id === g.id) ?? null
+            return {
+              ...g,
+              session,
+              actions: session ? store.actions.filter((a) => a.session_id === session.id) : [],
+              reports: store.reports.filter((r) => r.game_id === g.id),
+            }
+          }),
+      })
+    },
     match: async (id) => clone(store.matches.find((m) => m.id === id)),
     updateMatch: async (id, patch, guard) => update('matches', id, patch, guard),
     games: async (matchId) => clone(store.games.filter((g) => g.match_id === matchId)),

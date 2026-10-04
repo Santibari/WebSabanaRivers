@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { TeamPlate, TurnHeader } from './parts.jsx'
-import { splashUrl, squareUrl } from '../../lib/ddragon.js'
+import { splashUrl, squareUrl, loadingUrl } from '../../lib/ddragon.js'
 
 /** Vista de espectador del admin: escenario con splash arts, bans y lo ya jugado en la serie. */
 export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
@@ -11,11 +11,13 @@ export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
   const drafting = session?.status === 'drafting'
   const cur = d.current
 
+  // Paneles con la imagen vertical (loading screen) de Data Dragon: tiene la misma proporción
+  // que el panel (308×560), así el campeón se ve COMPLETO, sin recortes.
   const panels = (side) => {
     const picks = d.state.picks[side]
     const blue = side === 'blue'
     return (
-      <div className={`flex flex-1 gap-2 ${blue ? '' : ''}`}>
+      <div className="flex flex-1 items-end gap-2 xl:gap-3">
         {Array.from({ length: 5 }, (_, i) => {
           const c = champ(picks[i])
           const active = drafting && cur?.side === side && cur.type === 'pick' && i === picks.length
@@ -24,23 +26,30 @@ export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
           return (
             <div
               key={i}
-              className={`relative flex-1 skew-panel overflow-hidden ${
+              style={{ animationDelay: `${(blue ? i : 4 - i) * 60}ms` }}
+              className={`relative aspect-[308/560] flex-1 animate-pop-in overflow-hidden ${
                 c ? (blue ? 'bg-sr-navy' : 'bg-sr-wine') : `border border-dashed ${blue ? 'border-sr-blue/70' : 'border-sr-red/70'} bg-sr-panel`
               } ${active ? 'animate-pulse-sky' : ''}`}
             >
               {shown && (
                 <img
-                  src={splashUrl(shown.id)}
+                  key={`${shown.id}-${c ? 'lock' : 'prev'}`}
+                  src={loadingUrl(shown.id)}
                   alt=""
-                  className={`absolute inset-0 h-full w-[260%] max-w-none -translate-x-[30%] object-cover unskew ${c ? '' : 'opacity-35 grayscale'}`}
+                  className={`absolute inset-0 h-full w-full object-cover object-top ${c ? 'animate-reveal-up' : 'animate-fade-in opacity-40 grayscale'}`}
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-              <div className="absolute inset-x-0 bottom-4 unskew text-center">
-                {shown && <p className={`px-3 font-display leading-tight ${shown.name.length > 9 ? 'text-sm xl:text-lg' : 'text-lg xl:text-2xl'} ${c ? '' : 'opacity-60'}`}>{shown.name}</p>}
+              {c && <span key={`sw-${c.id}`} className="sweep absolute inset-0" aria-hidden="true" />}
+              <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+              <div className="absolute inset-x-0 bottom-3 text-center">
+                {shown && (
+                  <p key={shown.id} className={`animate-name-in px-2 font-display leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${shown.name.length > 9 ? 'text-sm xl:text-lg' : 'text-lg xl:text-2xl'} ${c ? '' : 'opacity-60'}`}>
+                    {shown.name}
+                  </p>
+                )}
                 <p className="eyebrow !text-[0.6rem] text-[#c9d1dd] !tracking-[0.25em]">{active ? 'Eligiendo…' : `Pick ${i + 1}`}</p>
               </div>
-              <div className={`absolute inset-x-0 bottom-0 h-1 ${c ? (blue ? 'bg-sr-sky' : 'bg-sr-red') : ''}`} />
+              <div className={`absolute inset-x-0 bottom-0 h-1 transition-colors ${c ? (blue ? 'bg-sr-sky shadow-[0_0_12px_rgb(79_179_255)]' : 'bg-sr-red shadow-[0_0_12px_rgb(210_58_74)]') : ''}`} />
             </div>
           )
         })}
@@ -55,9 +64,19 @@ export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
         const list = d.state.bans[side]
         const c = champ(list[i])
         const active = drafting && cur?.side === side && cur.type === 'ban' && i === list.length
+        const preview = active && hover[side] ? champ(hover[side]) : null
+        const shown = c ?? preview
         return (
-          <div key={i} className={`relative grid size-14 place-items-center overflow-hidden border xl:size-[76px] ${active ? 'border-2 border-sr-sky' : 'border-sr-line'} bg-sr-panel`}>
-            {c && <img src={squareUrl(champs.version, c.id)} alt="" className="absolute inset-0 h-full w-full object-cover grayscale-[0.7]" />}
+          <div key={i} className={`relative grid size-14 place-items-center overflow-hidden border xl:size-[76px] ${active ? 'border-2 border-sr-sky shadow-[0_0_16px_rgb(79_179_255/0.5)]' : 'border-sr-line'} bg-sr-panel`}>
+            {shown && (
+              <img
+                key={`${shown.id}-${c ? 'ban' : 'prev'}`}
+                src={squareUrl(champs.version, shown.id)}
+                alt=""
+                className={`absolute inset-0 h-full w-full object-cover ${c ? 'animate-ban-slam grayscale-[0.7]' : 'animate-fade-in opacity-40'}`}
+              />
+            )}
+            {c && <span key={`x-${c.id}`} className="absolute inset-x-1 top-1/2 h-0.5 origin-left animate-strike bg-sr-red shadow-[0_0_8px_rgb(210_58_74)]" aria-hidden="true" />}
             <span className="relative text-center text-[0.68rem] font-semibold drop-shadow">{c ? c.name : active ? 'Eligiendo…' : i < list.length ? '—' : ''}</span>
           </div>
         )
@@ -68,16 +87,16 @@ export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
   const title = drafting ? `${d.phaseLabel}` : session?.status === 'done' ? 'Draft cerrado' : 'Sala de espera'
 
   return (
-    <div className="relative flex min-h-dvh flex-col gap-4 overflow-hidden p-4 xl:p-8">
+    <div className="relative flex min-h-dvh animate-fade-in flex-col gap-4 overflow-hidden p-4 xl:p-8">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <TeamPlate team={d.blue} side="blue" />
+        <TeamPlate team={d.blue} side="blue" active={drafting && cur?.side === 'blue'} />
         <div className="w-[min(36vw,420px)]">
-          <TurnHeader meta={d.meta} title={title} remaining={drafting ? remaining : null} total={session?.pick_seconds ?? 30} paused={session?.paused} accent="white" />
+          <TurnHeader meta={d.meta} title={title} subtitle={drafting && cur ? `${d.teamName(cur.side)} · ${d.actionLabel}` : null} remaining={drafting ? remaining : null} total={session?.pick_seconds ?? 30} paused={session?.paused} accent={drafting && cur?.side === 'red' ? 'red' : drafting ? 'sky' : 'white'} />
         </div>
-        <TeamPlate team={d.red} side="red" />
+        <TeamPlate team={d.red} side="red" active={drafting && cur?.side === 'red'} />
       </div>
 
-      <div className="flex min-h-[340px] flex-1 items-stretch gap-6 xl:gap-10">
+      <div className="flex flex-1 items-center gap-6 xl:gap-10">
         {panels('blue')}
         <div className="w-px bg-sr-line" />
         {panels('red')}
@@ -104,12 +123,18 @@ export function SpectatorView({ room, d, champs, hover, remaining, controls }) {
       {controls}
 
       {moment && (
-        <div className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-black/70" role="status" aria-live="assertive">
-          <div key={moment.key} className={`w-[min(76vw,1400px)] animate-splash border-2 ${moment.side === 'blue' ? 'border-sr-sky' : 'border-[#ff6b79]'} bg-black`}>
-            <img src={splashUrl(moment.champ.id)} alt="" className="aspect-[1215/717] w-full object-cover" />
-            <div className="flex items-end justify-between bg-black/90 px-8 py-6">
-              <p className={`eyebrow !text-xl ${moment.side === 'blue' ? 'text-sr-sky' : 'text-[#ff6b79]'}`}>{d.teamName(moment.side)} elige</p>
-              <p className="font-display text-6xl">{moment.champ.name}</p>
+        <div key={moment.key} className="pointer-events-none fixed inset-0 z-40 grid animate-[fade-in_0.25s_ease-out_both] place-items-center bg-black/75 backdrop-blur-sm" role="status" aria-live="assertive">
+          <div
+            className={`w-[min(80vw,calc((100dvh-190px)*1.694))] animate-splash border-2 bg-black ${
+              moment.side === 'blue' ? 'border-sr-sky shadow-[0_0_80px_rgb(79_179_255/0.45)]' : 'border-[#ff6b79] shadow-[0_0_80px_rgb(210_58_74/0.45)]'
+            }`}
+          >
+            <div className="sweep">
+              <img src={splashUrl(moment.champ.id)} alt="" className="aspect-[1215/717] w-full animate-lock-in object-cover" />
+            </div>
+            <div className="flex items-end justify-between gap-6 bg-black/90 px-8 py-5">
+              <p className={`eyebrow animate-name-in !text-lg ${moment.side === 'blue' ? 'text-sr-sky' : 'text-[#ff6b79]'}`}>{d.teamName(moment.side)} elige</p>
+              <p className="animate-name-in font-display text-5xl xl:text-6xl">{moment.champ.name}</p>
             </div>
           </div>
         </div>

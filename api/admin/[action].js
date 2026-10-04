@@ -1,6 +1,6 @@
 // /api/admin/draft · schedule · bracket · scoring — solo admin/superadmin. Todo queda en audit_log.
 import { handler, parse, requireRole, z, HttpError, supabaseAdmin } from '../_lib/core.js'
-import { roomService } from '../_lib/room.js'
+import { mutate } from '../_lib/room.js'
 import { roundRobin } from '../../shared/draft-engine.js'
 import { generateBracket, roundName } from '../../shared/standings.js'
 
@@ -17,10 +17,11 @@ async function audit(user, action, entity, entityId, after) {
 export default handler({
   draft: {
     // Pausar, reanudar, deshacer, reiniciar tiempo, cambiar lados, forzar inicio, resolver disputa.
+    // Sirve con sesión de admin o con el enlace de admin de la sala (drafts libres sin cuenta).
     run: async ({ req, body }) => {
-      const user = await requireRole(req, ADMINS)
       const b = parse(z.object({
         matchId: z.string().uuid(),
+        token: z.string().min(20).max(100).optional(),
         op: z.enum(['pause', 'resume', 'undo', 'reset-timer', 'swap-sides', 'force-start', 'resolve']),
         payload: z.object({
           winner: z.enum(['blue', 'red']).optional(),
@@ -30,7 +31,7 @@ export default handler({
           red_dragons: z.number().int().min(0).max(20).optional(),
         }).default({}),
       }), body)
-      await roomService().admin(b.matchId, { role: 'admin', userId: user.id }, b.op, b.payload)
+      return mutate(req, b, (svc, actor) => svc.admin(b.matchId, actor, b.op, b.payload))
     },
   },
 

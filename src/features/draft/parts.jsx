@@ -1,71 +1,87 @@
 import { memo, useMemo, useState } from 'react'
 import { TeamLogo } from '../../components/ui.jsx'
-import { squareUrl, loadingUrl, ROLE_ORDER, ROLE_LABEL, ROLE_SHORT, roleIconUrl, searchKey } from '../../lib/ddragon.js'
+import { squareUrl, splashUrl, ROLE_ORDER, ROLE_LABEL, ROLE_SHORT, roleIconUrl, searchKey } from '../../lib/ddragon.js'
 import { clock } from '../../lib/format.js'
 
 /** Barra superior de cada equipo (azul a la izquierda, rojo a la derecha). */
-export function TeamPlate({ team, side, mine, dim = false }) {
+export function TeamPlate({ team, side, mine, dim = false, active = false }) {
   const blue = side === 'blue'
   return (
     <div
-      className={`flex h-14 items-center gap-4 px-5 sm:h-16 sm:px-7 ${blue ? 'clip-right bg-sr-blue' : 'clip-left flex-row-reverse bg-[#b3212f]'} ${dim ? 'opacity-60' : ''}`}
+      className={`relative flex h-14 items-center gap-4 overflow-hidden px-5 transition-[filter,opacity] duration-300 sm:h-16 sm:px-7 ${
+        blue ? 'clip-right animate-[pop-in_0.5s_ease-out_both] bg-sr-blue' : 'clip-left flex-row-reverse animate-[pop-in_0.5s_0.1s_ease-out_both] bg-[#b3212f]'
+      } ${dim ? 'opacity-60' : ''} ${active ? 'brightness-110' : 'brightness-90'}`}
     >
-      <TeamLogo team={team} size={40} className="!border-2 !border-sr-white" />
-      <span className="truncate font-display text-xl sm:text-3xl">{team?.name ?? '—'}</span>
-      {mine && <span className="hidden bg-black px-3 py-1 font-cond text-xs font-bold tracking-[0.3em] sm:inline">TU EQUIPO</span>}
+      {active && <span className={`absolute inset-y-0 w-1/3 animate-[shimmer_2.4s_linear_infinite] bg-gradient-to-r from-transparent via-white/15 to-transparent bg-[length:200%_100%] ${blue ? 'left-0' : 'right-0'}`} aria-hidden="true" />}
+      <TeamLogo team={team} size={40} className="relative !border-2 !border-sr-white" />
+      <span className="relative truncate font-display text-xl sm:text-3xl">{team?.name ?? '—'}</span>
+      {mine && <span className="relative hidden bg-black px-3 py-1 font-cond text-xs font-bold tracking-[0.3em] sm:inline">TU EQUIPO</span>}
     </div>
   )
 }
 
 /** Centro superior: contexto, turno, reloj y barra que se vacía. */
-export function TurnHeader({ meta, title, remaining, total, paused, accent = 'sky', big = true }) {
+export function TurnHeader({ meta, title, subtitle, remaining, total, paused, accent = 'sky', big = true }) {
   const pct = remaining == null ? 0 : Math.max(0, Math.min(100, (remaining / (total * 1000)) * 100))
   const low = remaining != null && remaining < 8000
+  const critical = remaining != null && remaining < 5000 && !paused
   return (
     <div className="flex flex-col items-center text-center">
       <p className="eyebrow !text-[0.7rem] text-[#c9d1dd] sm:!text-sm">{meta}</p>
-      <p className={`mt-1 font-display ${big ? 'text-2xl sm:text-4xl xl:text-5xl' : 'text-xl sm:text-3xl'} ${accent === 'sky' ? 'text-sr-sky' : accent === 'red' ? 'text-[#ff6b79]' : 'text-sr-white'}`}>
-        {title}
+      {subtitle && (
+        <p key={subtitle} className={`mt-1 max-w-full animate-[pop-in_0.3s_ease-out_both] truncate font-cond text-sm font-bold uppercase tracking-[0.25em] ${accent === 'red' ? 'text-[#ff6b79]' : accent === 'sky' ? 'text-sr-sky' : 'text-[#c9d1dd]'}`}>
+          {subtitle}
+        </p>
+      )}
+      <p className={`mt-1 whitespace-nowrap font-display ${big ? 'text-2xl sm:text-4xl xl:text-5xl' : 'text-xl sm:text-3xl'} ${accent === 'sky' ? 'text-sr-sky' : accent === 'red' ? 'text-[#ff6b79]' : 'text-sr-white'}`}>
+        <span key={title} className="inline-block animate-[pop-in_0.35s_ease-out_both]">{title}</span>
         {remaining != null && (
-          <span className={`ml-3 tabular-nums ${low ? 'text-[#ff6b79]' : 'text-sr-white'}`} aria-live="off">
+          <span className={`ml-3 inline-block tabular-nums ${low ? 'text-[#ff6b79]' : 'text-sr-white'} ${critical ? 'animate-urgent' : ''}`} aria-live="off">
             {paused ? 'PAUSA' : clock(remaining)}
           </span>
         )}
       </p>
-      <div className="mt-2 h-1.5 w-full max-w-xl bg-sr-line" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Tiempo restante">
-        <div className={`h-full transition-[width] duration-200 ease-linear ${low ? 'bg-sr-red' : 'bg-sr-sky'}`} style={{ width: `${pct}%` }} />
+      <div className="mt-2 h-1.5 w-full max-w-xl overflow-hidden bg-sr-line" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Tiempo restante">
+        <div
+          className={`h-full transition-[width] duration-200 ease-linear ${low ? 'bg-sr-red shadow-[0_0_12px_rgb(210_58_74/0.9)]' : 'bg-sr-sky shadow-[0_0_12px_rgb(79_179_255/0.7)]'}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   )
 }
 
-/** Slot de pick vertical (vista del capitán). */
-export function PickSlot({ side, champ, role, active, preview, index }) {
+/** Slot de pick (vista del capitán): splash completa, se "fija" con destello al confirmar. */
+export function PickSlot({ side, champ, role, active, preview, pending, index }) {
   const blue = side === 'blue'
   const shown = champ ?? preview
   const roleTxt = shown?.roles?.[0] ? ROLE_SHORT[shown.roles[0]] : role
   return (
     <div
-      className={`relative flex min-h-0 flex-1 items-center overflow-hidden border-sr-line ${blue ? 'border-l-4 border-l-sr-sky' : 'border-r-4 border-r-sr-red'} ${
+      className={`relative flex min-h-0 flex-1 items-end overflow-hidden border-sr-line ${blue ? 'border-l-4 border-l-sr-sky' : 'border-r-4 border-r-sr-red'} ${
         champ ? (blue ? 'bg-sr-navy' : 'bg-sr-wine') : 'bg-sr-panel'
-      } ${active ? 'animate-pulse-sky' : ''}`}
+      } ${active ? 'animate-pulse-sky' : ''} ${pending ? 'shimmer-bg animate-shimmer' : ''}`}
       aria-label={`Pick ${index + 1} ${shown ? shown.name : 'vacío'}`}
     >
       {shown && (
         <img
-          src={loadingUrl(shown.id)}
+          key={`${shown.id}-${champ ? 'lock' : 'prev'}`}
+          src={splashUrl(shown.id)}
           alt=""
-          className={`absolute inset-0 h-full w-full object-cover object-[50%_18%] ${champ ? 'opacity-70' : 'opacity-30 grayscale'}`}
+          className={`absolute inset-0 h-full w-full object-cover object-[center_22%] ${
+            champ ? `opacity-90 ${pending ? '' : 'animate-lock-in'}` : 'animate-fade-in opacity-35 grayscale'
+          }`}
         />
       )}
-      <div className={`absolute inset-0 ${blue ? 'bg-gradient-to-r' : 'bg-gradient-to-l'} from-black/80 via-black/30 to-transparent`} />
+      {champ && !pending && <span key={`sweep-${champ.id}`} className="sweep absolute inset-0" aria-hidden="true" />}
+      <div className={`absolute inset-0 ${blue ? 'bg-gradient-to-r' : 'bg-gradient-to-l'} from-black/85 via-black/20 to-transparent`} />
       {shown ? (
-        <div className={`relative flex w-full items-center gap-2 px-4 ${blue ? '' : 'flex-row-reverse'}`}>
+        <div key={shown.id} className={`relative flex w-full items-center gap-2 px-4 pb-3 animate-name-in ${blue ? '' : 'flex-row-reverse'}`}>
           <span className="font-cond text-xs tracking-widest text-sr-gray">{roleTxt}</span>
-          <span className={`font-display text-lg sm:text-2xl ${champ ? '' : 'opacity-60'}`}>{shown.name}</span>
+          <span className={`font-display text-lg drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-2xl ${champ ? '' : 'opacity-60'}`}>{shown.name}</span>
         </div>
       ) : (
-        <svg viewBox="0 0 24 24" className={`relative mx-auto size-10 ${active ? 'text-sr-sky' : 'text-sr-line'}`} aria-hidden="true">
+        <svg viewBox="0 0 24 24" className={`relative m-auto size-10 transition-colors ${active ? 'text-sr-sky animate-float' : 'text-sr-line'}`} aria-hidden="true">
           <path d="M4 20v-8a8 8 0 0 1 16 0v8h-5v-6h-6v6z" fill="currentColor" />
         </svg>
       )}
@@ -73,7 +89,7 @@ export function PickSlot({ side, champ, role, active, preview, index }) {
   )
 }
 
-/** Fila de bans (5 casillas inclinadas). */
+/** Fila de bans: entran "de golpe" y se tachan con una línea roja animada. */
 export function BanRow({ side, bans, activeIndex, preview, version, align = 'left' }) {
   return (
     <div className={`flex gap-2 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
@@ -85,14 +101,21 @@ export function BanRow({ side, bans, activeIndex, preview, version, align = 'lef
         return (
           <div
             key={i}
-            className={`relative grid h-14 w-14 place-items-center overflow-hidden border sm:h-[72px] sm:w-[84px] skew-panel ${
-              active ? 'border-sr-sky border-2 shadow-[0_0_18px_rgb(79_179_255/0.4)]' : 'border-sr-line'
+            className={`relative grid h-14 w-14 place-items-center overflow-hidden border sm:h-[72px] sm:w-[84px] skew-panel transition-shadow ${
+              active ? 'border-2 border-sr-sky shadow-[0_0_18px_rgb(79_179_255/0.45)]' : 'border-sr-line'
             } bg-sr-panel`}
             title={c ? `Ban: ${c.name}` : done ? 'Ban vacío (tiempo agotado)' : `Ban ${i + 1}`}
           >
-            {shown && <img src={squareUrl(version, shown.id)} alt="" className={`absolute inset-0 h-full w-full object-cover unskew scale-125 ${c ? 'grayscale-[0.6]' : 'opacity-40'}`} />}
-            {c && <span className="absolute inset-x-1 top-1/2 h-0.5 -rotate-12 bg-sr-red/90" aria-hidden="true" />}
-            <span className="relative unskew px-1 text-center font-semibold text-[0.7rem] leading-tight drop-shadow sm:text-xs">
+            {shown && (
+              <img
+                key={`${shown.id}-${c ? 'ban' : 'prev'}`}
+                src={squareUrl(version, shown.id)}
+                alt=""
+                className={`absolute inset-0 h-full w-full scale-125 object-cover unskew ${c ? 'animate-ban-slam grayscale-[0.7]' : 'animate-fade-in opacity-40'}`}
+              />
+            )}
+            {c && <span key={`x-${c.id}`} className="absolute inset-x-1 top-1/2 h-0.5 origin-left animate-strike bg-sr-red shadow-[0_0_8px_rgb(210_58_74)]" aria-hidden="true" />}
+            <span className="relative unskew px-1 text-center text-[0.7rem] font-semibold leading-tight drop-shadow sm:text-xs">
               {c ? c.name : done ? '—' : active ? `Ban ${i + 1}` : ''}
             </span>
           </div>
@@ -123,7 +146,7 @@ export const ChampionGrid = memo(function ChampionGrid({ champions, version, sta
             key={r}
             onClick={() => setRole(r)}
             aria-pressed={role === r}
-            className={`flex items-center gap-1.5 border px-3 py-2 font-cond text-sm font-bold uppercase tracking-[0.18em] sm:px-4 ${
+            className={`flex items-center gap-1.5 border px-3 py-2 font-cond text-sm font-bold uppercase tracking-[0.18em] transition-colors sm:px-4 ${
               role === r ? 'border-sr-blue bg-sr-blue' : 'border-sr-line bg-sr-panel hover:border-sr-gray'
             }`}
           >
@@ -140,8 +163,8 @@ export const ChampionGrid = memo(function ChampionGrid({ champions, version, sta
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar campeón" className="w-full border border-sr-line bg-sr-panel py-2 pl-9 pr-3 placeholder:text-sr-gray focus:border-sr-sky focus:outline-none" />
         </label>
       </div>
-      <div className="thin-scroll mt-3 grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 overflow-y-auto border border-sr-line bg-black/30 p-2 sm:grid-cols-[repeat(auto-fill,minmax(104px,1fr))]">
-        {list.map((c) => {
+      <div key={role + q} className="thin-scroll mt-3 grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2 overflow-y-auto border border-sr-line bg-black/30 p-2 sm:grid-cols-[repeat(auto-fill,minmax(104px,1fr))]">
+        {list.map((c, i) => {
           const st = status(c.id)
           const isSel = selected === c.id
           const blocked = !!st
@@ -156,11 +179,12 @@ export const ChampionGrid = memo(function ChampionGrid({ champions, version, sta
               title={st?.note ?? `${c.name} · ${c.roles.map((r) => ROLE_LABEL[r]).join(', ')}`}
               aria-label={`${c.name}${st ? `, ${st.note}` : ''}`}
               aria-pressed={isSel}
-              className={`group relative aspect-square overflow-hidden border text-left transition ${
-                isSel ? 'border-2 border-sr-sky shadow-[0_0_16px_rgb(79_179_255/0.45)]' : 'border-sr-line'
-              } ${blocked ? 'cursor-not-allowed' : disabled ? 'cursor-default' : 'hover:border-sr-gray'}`}
+              style={{ animationDelay: `${Math.min(i, 30) * 12}ms` }}
+              className={`group relative aspect-square animate-pop-in overflow-hidden border text-left transition duration-200 ${
+                isSel ? 'z-10 scale-[1.04] border-2 border-sr-sky shadow-[0_0_20px_rgb(79_179_255/0.55)]' : 'border-sr-line'
+              } ${blocked ? 'cursor-not-allowed' : disabled ? 'cursor-default' : 'hover:-translate-y-0.5 hover:border-sr-gray hover:shadow-[0_6px_18px_rgb(0_0_0/0.5)]'}`}
             >
-              <img src={squareUrl(version, c.id)} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover ${blocked ? 'opacity-25 grayscale' : 'group-hover:scale-105 transition-transform'}`} />
+              <img src={squareUrl(version, c.id)} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover transition-transform duration-300 ${blocked ? 'opacity-25 grayscale' : 'group-hover:scale-110'}`} />
               <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
               {tag && (
                 <span className={`absolute left-1.5 top-1.5 flex items-center gap-1 font-cond text-[0.62rem] font-bold tracking-[0.15em] ${tagColor}`}>
