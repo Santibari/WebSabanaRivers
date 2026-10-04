@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+
+/* Paleta Sabana Rivers (tokens del plan) */
+:root {
+  --sr-black: #0a0e14;
+  --sr-ink: #05070b;
+  --sr-navy: #0b1f3a;
+  --sr-blue: #1e5aa8;
+  --sr-sky: #4fb3ff;
+  --sr-white: #f5f7fa;
+  --sr-gray: #8a94a6;
+  --sr-red: #d23a4a;
+  --sr-wine: #3b1118;
+  --sr-panel: #0d121b;
+  --sr-line: #1c2433;
+}
+
+@theme {
+  --color-sr-black: #0a0e14;
+  --color-sr-ink: #05070b;
+  --color-sr-navy: #0b1f3a;
+  --color-sr-blue: #1e5aa8;
+  --color-sr-sky: #4fb3ff;
+  --color-sr-white: #f5f7fa;
+  --color-sr-gray: #8a94a6;
+  --color-sr-red: #d23a4a;
+  --color-sr-wine: #3b1118;
+  --color-sr-panel: #0d121b;
+  --color-sr-line: #1c2433;
+
+  --font-display: 'Alfa Slab One', Georgia, serif;
+  --font-sans: 'Barlow', system-ui, sans-serif;
+  --font-cond: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-pulse-sky: pulse-sky 1.4s ease-in-out infinite;
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-splash: splash 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-flip: flip 1.6s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes pulse-sky {
+    0%, 100% { box-shadow: inset 0 0 0 2px var(--sr-sky), 0 0 0 0 rgb(79 179 255 / 0.5); }
+    50% { box-shadow: inset 0 0 0 2px var(--sr-sky), 0 0 22px 2px rgb(79 179 255 / 0.35); }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes splash {
+    0% { opacity: 0; transform: scale(1.08); }
+    12% { opacity: 1; transform: scale(1); }
+    80% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.35) translateY(30%); }
+  }
+  @keyframes flip {
+    0% { transform: rotateY(0) translateY(0); }
+    50% { transform: rotateY(900deg) translateY(-40px); }
+    100% { transform: rotateY(1800deg) translateY(0); }
+  }
+}
+
+html { background: var(--sr-ink); color-scheme: dark; }
+body {
+  background: var(--sr-ink);
+  color: var(--sr-white);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* Rejilla sutil del afiche */
+.sr-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Etiquetas espaciadas tipo afiche */
+.eyebrow {
+  font-family: var(--font-cond);
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+/* Recortes inclinados de las barras de equipo y botones */
+.clip-right { clip-path: polygon(0 0, 100% 0, calc(100% - 22px) 100%, 0 100%); }
+.clip-left { clip-path: polygon(22px 0, 100% 0, 100% 100%, 0 100%); }
+.clip-btn { clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+.skew-panel { transform: skewX(-8deg); }
+.unskew { transform: skewX(8deg); }
+
+/* Foco visible para teclado (accesibilidad AA) */
+:focus-visible { outline: 2px solid var(--sr-sky); outline-offset: 2px; }
+
+/* Trazos de circuito animados */
+.circuit-path {
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: draw 3.2s ease-out forwards;
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.circuit-pulse { animation: blink 2.4s ease-in-out infinite; }
+@keyframes blink { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  .circuit-path { stroke-dashoffset: 0; }
+}
+
+/* Scrollbar discreta en la grilla del draft */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--sr-line) transparent; }
+
+.prose-sr h2 { font-family: var(--font-display); font-size: 1.4rem; margin: 1.2em 0 0.4em; }
+.prose-sr h3 { font-weight: 700; font-size: 1.1rem; margin: 1em 0 0.3em; }
+.prose-sr p { margin: 0.6em 0; color: #c9d1dd; line-height: 1.6; }
+.prose-sr ul { list-style: disc; padding-left: 1.4em; color: #c9d1dd; }
+.prose-sr a { color: var(--sr-sky); text-decoration: underline; }

@@ -1,0 +1,13 @@
+project_id = "sabana-rivers-draft"
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql", "./seed/*.sql"]
