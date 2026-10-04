@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './styles.css'
 import { AuthProvider, LiveUpdates } from './app/hooks.jsx'
+import { configError } from './lib/repo/index.js'
 import { Layout, BareLayout } from './app/Layout.jsx'
 import { HomePage } from './features/home/HomePage.jsx'
 import { TournamentsPage } from './features/tournaments/TournamentsPage.jsx'
@@ -78,8 +79,19 @@ const router = createBrowserRouter([
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 15_000 } } })
 
+function ConfigError() {
+  return (
+    <div className="mx-auto max-w-xl px-6 py-24 text-center">
+      <img src="/logo-sabana-rivers.png" alt="Sabana Rivers" className="mx-auto h-32 w-auto" />
+      <h1 className="mt-8 font-display text-3xl">Web en mantenimiento</h1>
+      <p className="mt-3 text-sr-gray">Estamos terminando de configurar la plataforma. Vuelve en unos minutos.</p>
+      <p className="mt-8 text-xs text-sr-gray/70">{configError} Agrégalas en Vercel → Settings → Environment Variables y vuelve a desplegar.</p>
+    </div>
+  )
+}
+
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  configError ? <ConfigError /> : <StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={qc}>
         <AuthProvider>

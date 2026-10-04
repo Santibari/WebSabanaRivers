@@ -1,7 +1,18 @@
-// Punto único de acceso a datos. Con VITE_SUPABASE_URL configurado usa Supabase;
-// si no, arranca en modo demo (todo en el navegador) para poder probar la web completa.
+// Punto único de acceso a datos.
+// - Con VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY → Supabase.
+// - Sin ellas, en desarrollo (npm run dev) → modo demo, todo en el navegador.
+// - Sin ellas en producción → NO se activa el demo en silencio: la app muestra un error de configuración
+//   (salvo que se pida a propósito con VITE_DEMO=true).
 import { demoRepo } from './demo.js'
 
-export const isDemo = !import.meta.env.VITE_SUPABASE_URL
+const hasSupabase = !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
+const demoAllowed = import.meta.env.DEV || import.meta.env.VITE_DEMO === 'true'
 
-export const repo = isDemo ? demoRepo : (await import('./supabase.js')).supabaseRepo
+export const isDemo = !hasSupabase && demoAllowed
+
+/** Mensaje si el build de producción quedó sin las variables de Supabase. */
+export const configError = !hasSupabase && !demoAllowed
+  ? 'Faltan las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en este despliegue.'
+  : null
+
+export const repo = hasSupabase ? (await import('./supabase.js')).supabaseRepo : demoRepo
